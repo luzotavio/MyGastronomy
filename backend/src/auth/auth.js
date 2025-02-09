@@ -8,10 +8,11 @@ import { ObjectId } from 'mongodb'
 import { STATUS_CODES } from 'http'
 
 const collectionName = 'users'
+const authRouter = express.Router()
 
-passport.use(new LocalStrategy({usernameField: 'email'}, async (ElementInternals, password, callback ) => {
-    const user = await Mongo.ObjectId
-    .collectionName(collectionName)
+passport.use(new LocalStrategy({usernameField: 'email'}, async (email, password, callback ) => {
+    const user = await Mongo.db
+    .collection(collectionName)
     .findOne({email: email})
 
     if (!user) {
@@ -25,7 +26,7 @@ passport.use(new LocalStrategy({usernameField: 'email'}, async (ElementInternals
             return callback(null, false)
         }
 
-        const userPasswordBuffer = Buffer.from(use.password.buffer)
+        const userPasswordBuffer = Buffer.from(user.password.buffer)
 
         if(!crypto.timingSafeEqual(userPasswordBuffer, hashedPassword)) {
             return callback(null, false)
@@ -37,7 +38,6 @@ passport.use(new LocalStrategy({usernameField: 'email'}, async (ElementInternals
     })
 }))
 
-const authRouter = express.Router()
 
 authRouter.post('/signup', async (req,res) => {
     const checkUser = await Mongo.db
@@ -95,5 +95,41 @@ authRouter.post('/signup', async (req,res) => {
         }
     })
 })      
+
+authRouter.post('/login', (req,res) => {
+    passport.authenticate('local', (error, user) => {
+        if(error) {
+            return res.status(500).send({
+                success: false,
+                statusCode: 500,
+                body: {
+                    text: 'Error during authentication',
+                    error
+                }
+            })
+        }
+
+        if(!user) {
+            return res.status(400).send ({
+                success: false,
+                statusCode: 400,
+                body: {
+                    text: 'crendentials are not correctly'
+                }
+            })
+        }
+
+        const token = jwt.sign(user, 'secret')
+        return res.status(200).send ({
+            success: true,
+            statusCode: 200,
+            body: {
+                text: 'User logged in correctly',
+                user,
+                token
+            }
+        })
+    })(req,res)
+})
 
 export default authRouter
